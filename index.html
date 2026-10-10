@@ -951,6 +951,9 @@ window.libStatus.gsap=window.libStatus.gsap&&!!(window.gsap&&window.gsap.ScrollT
 
   /* ===== ①② 粒子（Three.js：拼名字 + 粒子河） ===== */
   function bootThree(){
+    /* 移动端完全禁用 Three 粒子层：部分移动 GPU 将 GL_POINTS 渲染为方块/深色块，
+       会遮住页面文字（手机实测），桌面端保留完整入场效果 */
+    if(window.innerWidth<768||('ontouchstart' in window))return;
     if(!window.libStatus.three||!window.THREE)return;
     var canvas=document.getElementById("particle-canvas");
     if(!canvas)return;
@@ -977,22 +980,27 @@ window.libStatus.gsap=window.libStatus.gsap&&!!(window.gsap&&window.gsap.ScrollT
       }
       geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
       geo.setAttribute("color",new THREE.BufferAttribute(colors,3));
-      var mat=new THREE.PointsMaterial({size:.32,vertexColors:true,transparent:true,opacity:.85,depthWrite:false});
+      /* 移动端判定：小屏/触摸设备上密集点阵会成黑块 */
+      var isMobile=window.innerWidth<768||('ontouchstart' in window);
+      var mat=new THREE.PointsMaterial({size:.32,vertexColors:true,transparent:true,opacity:isMobile?.55:.85,depthWrite:false});
       var points=new THREE.Points(geo,mat);
       scene.add(points);
 
-      /* 中心汇聚点（拼名字意象） */
-      var coreGeo=new THREE.BufferGeometry();
-      var cpos=new Float32Array(180*3);
-      for(var j=0;j<180;j++){
-        cpos[j*3]=(Math.random()-.5)*4;
-        cpos[j*3+1]=(Math.random()-.5)*2;
-        cpos[j*3+2]=(Math.random()-.5)*1.6;
+      /* 中心汇聚点（拼名字意象）——移动端禁用 */
+      var core=null,coreMat=null;
+      if(!isMobile){
+        var coreGeo=new THREE.BufferGeometry();
+        var cpos=new Float32Array(180*3);
+        for(var j=0;j<180;j++){
+          cpos[j*3]=(Math.random()-.5)*4;
+          cpos[j*3+1]=(Math.random()-.5)*2;
+          cpos[j*3+2]=(Math.random()-.5)*1.6;
+        }
+        coreGeo.setAttribute("position",new THREE.BufferAttribute(cpos,3));
+        coreMat=new THREE.PointsMaterial({color:0x202B4A,size:.5,transparent:true,opacity:0});
+        core=new THREE.Points(coreGeo,coreMat);
+        scene.add(core);
       }
-      coreGeo.setAttribute("position",new THREE.BufferAttribute(cpos,3));
-      var coreMat=new THREE.PointsMaterial({color:0x202B4A,size:.5,transparent:true,opacity:0});
-      var core=new THREE.Points(coreGeo,coreMat);
-      scene.add(core);
 
       var t=0;
       function animate(){
@@ -1002,7 +1010,7 @@ window.libStatus.gsap=window.libStatus.gsap&&!!(window.gsap&&window.gsap.ScrollT
         points.rotation.x=Math.sin(t*.3)*.05;
         if(t<2.2){
           /* 汇聚 */
-          coreMat.opacity=t/2.2*.9;
+          if(core&&coreMat){coreMat.opacity=t/2.2*.9;}
           points.material.size=.32-(t/2.2)*.14;
           camera.position.z=46-(t/2.2)*10;
         }else if(t>3.4&&t<4.6){
@@ -1012,7 +1020,7 @@ window.libStatus.gsap=window.libStatus.gsap&&!!(window.gsap&&window.gsap.ScrollT
         }else if(t>=4.6){
           /* 入场完成：完全隐藏粒子层，避免残留小点盖在页面上 */
           points.visible=false;
-          core.visible=false;
+          if(core){core.visible=false;}
           if(!canvas._hidden){
             canvas._hidden=true;
             canvas.style.transition="opacity .6s ease";
